@@ -592,5 +592,6 @@ if __name__ == "__main__":
       --output_dir /tmp/$TASK_NAME/ \
       --pooling_layer_type CLS
  
+    Or use Colab: https://colab.research.google.com/drive/1B2y4R-i1Allcar2tniclkVf6WEO5prUN?usp=sharing
     """
     main()
