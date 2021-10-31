@@ -42,10 +42,22 @@ class MeanMaxTokensBertPooler(nn.Module):
 class MyBertPooler(nn.Module):
     def __init__(self, config):
         super().__init__()
-        raise NotImplementedError
+        self.w_mypooler = nn.LSTM(input_size = config.hidden_size, 
+                                 hidden_size = config.hidden_size, 
+                                 num_layers = 1,
+                                 batch_first=True)
+        self.activation = nn.Tanh()
+        # raise NotImplementedError
 
     def forward(self, hidden_states, *args, **kwargs):
-        raise NotImplementedError
+        # hidden_states: [N, T, H]
+        
+        output, h_n = self.w_mypooler(hidden_states) # [N, T, D * H], [D * num_layers, T, H]
+        pooled_output = output[:, -1, :] # [N, H]
+        pooled_output = self.activation(pooled_output) # [N, H]
+
+        return pooled_output
+        # raise NotImplementedError
 
 
 class MyBertConfig(BertConfig):
@@ -104,7 +116,7 @@ class MyBertForSequenceClassification(BertForSequenceClassification):
             output_hidden_states=None,
             return_dict=None,
     ):
-        if self.bert.pooling_layer_type in ["CLS", "MEAN_MAX"]:
+        if self.bert.pooling_layer_type in ["CLS", "MEAN_MAX", "MINE"]:
             return super().forward(
                 input_ids, attention_mask, token_type_ids, position_ids, head_mask,
                 inputs_embeds, labels, output_attentions, output_hidden_states, return_dict
