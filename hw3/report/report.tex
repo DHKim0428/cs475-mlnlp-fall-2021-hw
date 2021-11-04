@@ -6,37 +6,35 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage[margin=1in]{geometry}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{pdfpages}
 
-\title{CS475 Fall 2021 Homework 3}
+\title{AttentiveCLS Pooler}
 \author{
-  Team 0:  % team no
-  Jiseon Kim, and Alice Oh  % your names
+  Team 1:  % team no
+  Seungil Lee, Jongchan Park, Eugene Seo, and Dohyung Kim % your names
 }
 \date{\today}
 
 \begin{document}
 \maketitle
 
-BERT~\cite{devlin-etal-2019-bert} has become a standard architecture for NLP research ever since it was published. BERT computes the representation for every token, but for sentence-level tasks (e.g., sentiment analysis), we usually use the output representation of the special token \texttt{[CLS]}. Is this the best way to pool token-level representations to create the sentence-level representation?
+\section{Introduction}
 
-In this homework, your team will implement and compare different techniques for pooling token-level representation in BERT, namely \texttt{BERTPooler} in \texttt{huggingface} library (\url{https://huggingface.co/}).
+BERT~\cite{devlin-etal-2019-bert} has become a standard architecture for NLP research ever since it was published. BERT computes the representation for every token, but it uses the output representation of the special token \texttt{[CLS]}, for sentence-level tasks (e.g., sentiment analysis). However, various strategy can be applied to get sentence-level representation, so we are going to design new method and try some of them in this homework.
 
-\section{Tasks}
+We have designed new pooler named \texttt{AttentiveCLS} pooler and evaluated its performance on CoLa, MNLI and MRPC tasks, which are the representatives of sentence-level tasks. The results were compared with \texttt{MeanMaxTokens} pooler, which is suggested in the homework description, also with the original \texttt{BERTPooler} in \texttt{huggingface} library (\url{https://huggingface.co/}).
 
-One simple pooling method is to apply permutation-invariant operations (e.g., mean, max, sum) across all token representations. We define the output representation of \texttt{MeanMaxTokens} (shortly MMT) as:
-\begin{align}
-  C_{\text{MMT}} = \left[
-    \textstyle \sum_{i=0}^{L - 1} T_{i}\ ||\ \max_i T_{i}
-  \right],\quad
-   C_{\text{MMT}} \in \mathbb{R}^{2H},\quad
-   T_i \in \mathbb{R}^{H},
-\end{align}
-where $L$ is the maximum length of sequence and $||$ is the vector concatenation operation. Note that we borrow notations from the original BERT paper~\cite{devlin-etal-2019-bert}. 
+\section{AttentiveCLS Pooler}
+Though original BERT pooler simply adopts last output of \texttt{[CLS]} token, we tried to exploit information from other tokens as well. Nowadays, attention mechanism is widely used to get the importance of the given sequence, so we added a attention pooling layer on the top of the tokens other than \texttt{[CLS]} token. Then, the output of this attention layer is concatenated with the last output of \texttt{[CLS]} token.
+
+We also apply linear transformation with $W \in \mathbb{R}^{H \times 2H}$ and $\tanh$ activation just like as the \texttt{BERTPooler} in \texttt{huggingface} implementation.
 
 The \texttt{BERTPooler} in \texttt{huggingface} implementation applies linear transformation with $W \in \mathbb{R}^{H \times H}$ and $\tanh$ activation (See \texttt{BertPooler} class). Similarly, we apply linear transformation with $W_{\text{MMT}} \in \mathbb{R}^{H \times 2H}$ and $\tanh$ activation.
-\begin{align}
-  C = \tanh(C_{\text{MMT}}W_{\text{MMT}}^\top),\ C \in \mathbb{R}^{H}
-\end{align}
+
+\includepdf[pages=-]{figure1.pdf}
+
 
 The tasks in this homework are as follows:
 \begin{enumerate}
@@ -46,7 +44,19 @@ The tasks in this homework are as follows:
   \item Discuss the result. Negative results are fine, the point is how you interpret and explain it.
 \end{enumerate}
 
-\section{Submission}
+\section{Experiment}
+
+
+% \begin{table}[]
+% \begin{tabular}{|l|ll|lll|ll|ll|}
+% \hline
+% \multirow{2}{*}{} & \multicolumn{2}{c|}{CoLA}                                                        & \multicolumn{3}{c|}{MRPC}                                                                               & \multicolumn{2}{c|}{RTE}                                         & \multicolumn{2}{c|}{SST-2}                                       \\ \cline{2-10} 
+%                   & \multicolumn{1}{c|}{Loss}            & \multicolumn{1}{c|}{matthews_correlation} & \multicolumn{1}{c|}{Accuracy}        & \multicolumn{1}{c|}{F1}              & \multicolumn{1}{c|}{Loss} & \multicolumn{1}{c|}{Accuracy}        & \multicolumn{1}{c|}{Loss} & \multicolumn{1}{c|}{Accuracy}        & \multicolumn{1}{c|}{Loss} \\ \hline
+% AttentiveCLS      & \multicolumn{1}{l|}{0.4588}          & \textbf{0.6004}                           & \multicolumn{1}{l|}{\textbf{0.8554}} & \multicolumn{1}{l|}{\textbf{0.9012}} & \textbf{0.3952}           & \multicolumn{1}{l|}{0.6173}          & 0.7498                    & \multicolumn{1}{l|}{0.9289}          & 0.3272                    \\ \hline
+% MeanMax           & \multicolumn{1}{l|}{\textbf{0.4208}} & 0.5735                                    & \multicolumn{1}{l|}{0.8162}          & \multicolumn{1}{l|}{0.8777}          & 0.4424                    & \multicolumn{1}{l|}{0.5379}          & \textbf{0.6920}           & \multicolumn{1}{l|}{\textbf{0.9312}} & 0.2711                    \\ \hline
+% BERTPooler        & \multicolumn{1}{l|}{0.4388}          & 0.5934                                    & \multicolumn{1}{l|}{0.8456}          & \multicolumn{1}{l|}{0.8934}          & 0.4000                    & \multicolumn{1}{l|}{\textbf{0.6462}} & 0.7058                    & \multicolumn{1}{l|}{0.9300}          & \textbf{0.2387}           \\ \hline
+% \end{tabular}
+% \end{table}
 
 The files you should submit are
 \begin{enumerate}
@@ -55,13 +65,15 @@ The files you should submit are
 \end{enumerate}
 
 
-\section{Grading}
+\section{Experiment}
 
 Comprehensive evaluation based on clarity, validity, and interestingness. You will get zero points if you violate academic integrity (e.g., plagiarism and data manipulation).
 
+\section{Result}
 
-\pagebreak
+
 \bibliographystyle{plain}
-\bibliography{report}
+\bibliography{report.bib}
+
 
 \end{document}
