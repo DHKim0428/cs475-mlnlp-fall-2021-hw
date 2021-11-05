@@ -24,9 +24,9 @@ class MeanMaxTokensBertPooler(nn.Module):
         maxT = torch.gather(hidden_states, 1, indices) # [N, 1, H]
 
         # option 1: sum(T_i) || max(T_i)
-        sumT = torch.sum(hidden_states, dim=1) # [N, H]
+        sumT = torch.mean(hidden_states, dim=1) # [N, H]
         c_mmt = torch.cat((sumT, maxT.squeeze()), dim=1) # [N, 2H]
-                
+
         pooled_output = self.wmmt(c_mmt) # [N, H]
         pooled_output = self.activation(pooled_output) # [N, H]
 
