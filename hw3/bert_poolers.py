@@ -42,22 +42,116 @@ class MeanMaxTokensBertPooler(nn.Module):
 class MyBertPooler(nn.Module):
     def __init__(self, config):
         super().__init__()
+        
+        # MyBertPooler
+        # "RNN" / "Linear" / "Attentive" / "Min" / "Max" / "Mean"
+        self.mode = "Attentive2"
+
+        # 1-1. RNN-based
         self.w_mypooler = nn.LSTM(input_size = config.hidden_size, 
                                  hidden_size = config.hidden_size, 
                                  num_layers = 1,
                                  batch_first=True)
+        
+        # 1-2. Linear 
+        # self.w_linear_2 = nn.Linear()
+        # self.w_linear_1 = nn.Linear(config.hidden_size, 1)
+        self.w_linear_1 = None
+
+        # 1-3. Residual Linear 
+        self.w_residual_1 = nn.Linear(config.hidden_size, config.hidden_size)
+        self.w_residual_2 = nn.Linear(config.hidden_size, 1)
+        self.w_residual_s = nn.Linear(config.hidden_size, 1)
+
+        # 1-4. CNN
+
+        # 2. Attentive Pooling
+        # self.w_att_simple = nn.Linear()
+        self.query = nn.Linear(config.hidden_size, 1)
+        self.softmax = nn.Softmax()
+        self.w_2h = nn.Linear(2*config.hidden_size, config.hidden_size) # w_2h
+
+        # 3. Min / Max / Average
+        self.w_basic = nn.Linear(config.hidden_size, config.hidden_size) # W_basic
+
+        self.hidden_size = config.hidden_size
         self.activation = nn.Tanh()
         # raise NotImplementedError
 
     def forward(self, hidden_states, *args, **kwargs):
         # hidden_states: [N, T, H]
         
-        output, h_n = self.w_mypooler(hidden_states) # [N, T, D * H], [D * num_layers, T, H]
-        pooled_output = output[:, -1, :] # [N, H]
-        pooled_output = self.activation(pooled_output) # [N, H]
+        # if (self.mode == "RNN"): # 1-1. RNN-based
+        #   output, _ = self.w_mypooler(hidden_states) # [N, T, D * H], _
+        #   pooled_output = output[:, -1, :] # [N, H]
+        #   # pooled_output = torch.mean(output, dim=1)
+        #   pooled_output = self.activation(pooled_output) # [N, H]
+        #   return pooled_output
 
-        return pooled_output
-        # raise NotImplementedError
+        # elif (self.mode == "Linear"): # 1-2. Linear
+        #   # h_T = torch.transpose(hidden_states, 1, 2) # [N, H, T]
+        #   # pooled_output = self.w_linear_1(h_T) # [N, H, 1]
+        #   # pooled_output = self.activation(pooled_output.squeeze()) # [N, H]
+        #   if self.w_linear_1 is None:
+        #     self.w_linear_1 = nn.Linear(hidden_states.shape[1], 1).to('cuda')
+        #   h_T = torch.transpose(hidden_states, 1, 2) # [N, H, T]
+        #   pooled_output = self.w_linear_1(h_T)
+        #   pooled_output = self.activation(pooled_output.squeeze()) # [N, H]
+        #   # raise NotImplementedError
+        #   return pooled_output
+
+        # elif (self.mode == "Residual"): # 1-3. Residual Linerar
+        #   h_T = torch.transpose(hidden_states, 1, 2) # [N, H, T]
+        #   pooled_output = self.w_residual_1(h_T) # [N, H, T]
+        #   pooled_output = self.w_residual_2(pooled_output) # [N, H, 1]
+        #   pooled_output = self.activation(pooled_output.squeeze()) # [N, H]
+        #   pooled_output = pooled_output + (self.w_residual_s(h_T)).squeeze()
+        #   return pooled_output
+
+        # elif (self.mode == "Attentive"): # 2. Attentive Pooling
+        #   score = self.query(hidden_states)
+        #   score /= torch.sqrt(torch.tensor(self.hidden_size))
+        #   score = self.softmax(score)
+        #   pooled_output = torch.sum(score * hidden_states, dim=1)
+        #   pooled_output = self.w_basic(pooled_output)
+        #   pooled_output = self.activation(pooled_output)
+        #   return pooled_output
+
+        if (self.mode == "Attentive2"): # 2. Attentive Pooling
+          score = self.query(hidden_states[:, 1:, :]) # hidden_states[:, 1:, :] = [N, T-1, H] - everything except [CLS]
+          score /= torch.sqrt(torch.tensor(self.hidden_size))
+          score = self.softmax(score)
+          pooled_output = torch.sum(score * hidden_states[:, 1:, :], dim=1) # [N, H]
+          pooled_output = torch.cat((hidden_states[:, 0], pooled_output), dim=1) # [N, 2H]
+          pooled_output = self.w_2h(pooled_output)
+          pooled_output = self.activation(pooled_output)
+          return pooled_output
+
+        # elif (self.mode == "Min"): # 3-1. Min
+        #   norm = hidden_states.norm(dim=2) # [N, T]
+        #   min_id = torch.argmin(norm, dim=1) # [N]
+        #   min_id = torch.reshape(min_id, (-1, 1, 1)) # [N, 1, 1]
+        #   indices = torch.broadcast_to(min_id, (-1, 1, self.hidden_size)) # [N, 1, H]
+        #   minT = torch.gather(hidden_states, 1, indices) # [N, 1, H]
+        #   pooled_output = self.w_basic(minT.squeeze()) # [N, H]
+        #   pooled_output = self.activation(pooled_output)
+        #   return pooled_output
+
+        # elif (self.mode == "Max"): # 3-2. Max
+        #   norm = hidden_states.norm(dim=2) # [N, T]
+        #   max_id = torch.argmax(norm, dim=1) # [N]
+        #   max_id = torch.reshape(max_id, (-1, 1, 1)) # [N, 1, 1]
+        #   indices = torch.broadcast_to(max_id, (-1, 1, self.hidden_size)) # [N, 1, H]
+        #   maxT = torch.gather(hidden_states, 1, indices) # [N, 1, H]
+        #   pooled_output = self.w_basic(maxT.squeeze()) # [N, H]
+        #   pooled_output = self.activation(pooled_output)
+        #   return pooled_output
+
+        # elif (self.mode == "Mean"): # 3-3. Mean
+        #   pooled_output = torch.mean(output, dim=1) # [N, H]
+        #   pooled_output = self.w_basic(pooled_output) # [N, H]
+        #   pooled_output = self.activation(pooled_output)
+        #   return pooled_output
 
 
 class MyBertConfig(BertConfig):
